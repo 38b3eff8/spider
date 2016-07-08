@@ -206,23 +206,44 @@ class Task(object):
 class Config(object):
     def __init__(self):
         self.config = {
-            'worker': 1
+            'worker': 5
         }
 
     def get(self, key):
         return self.config.get(key)
 
 
+class RedisQueue(object):
+    def __init__(self, host='localhost', port=6379, db=0):
+        self._redis = redis.Redis(host, port, db)
+        self._redis.flushall()
+        self._queue_lock = threading.Lock()
+
+    def push_task(self, task, direct='left'):
+        self._queue_lock.acquire()
+        if not self._redis.get(task.url):
+            if direct == 'left':
+                self._redis.lpush('task_queue', pickle.dumps(task))
+            else:
+                self._redis.rpush('task_queue', pickle.dumps(task))
+            self._redis.set(task.url, 1)
+        self._queue_lock.release()
+
+    def pop_task(self):
+        task = self._redis.rpop('task_queue')
+        if task is not None:
+            task = pickle.loads(task)
+        return task
+
+
 class Spider(object):
     def __init__(self, start_url):
+        self.config = Config()
         self.r = Route()
-        self._redis = redis.Redis(host='localhost', port=6379, db=0)
-        self._redis.flushall()
+        self.task_queue = RedisQueue()
 
         task = Task(start_url)
         self.push_task(task)
-
-        self.config = Config()
 
     def route(self, url):
         def _deco(func):
@@ -235,29 +256,13 @@ class Spider(object):
             Worker(self).start()
 
     def push_task(self, task):
-        mutex = threading.Lock()
-        mutex.acquire()
-
-        # if self._redis.get(task.url):
-        #     print(int(self._redis.get(task.url).decode()), task.url)
-
-        if not self._redis.get(task.url) or int(self._redis.get(task.url).decode()):
-            if self.r.search(task.url):
-                self._redis.rpush('task_queue', pickle.dumps(task))
-            else:
-                self._redis.lpush('task_queue', pickle.dumps(task))
-            self._redis.set(task.url, 0)
-        mutex.release()
+        direct = 'left'
+        if self.r.search(task.url):
+            direct = 'right'
+        self.task_queue.push_task(task, direct)
 
     def pop_task(self):
-        mutex = threading.Lock()
-        mutex.acquire()
-        task = self._redis.rpop('task_queue')
-        if task is not None:
-            task = pickle.loads(task)
-            self._redis.set(task.url, 1)
-        mutex.release()
-        return task
+        return self.task_queue.pop_task()
 
 
 spider = Spider('http://www.mahua.com/xiaohua/1628976.htm')
@@ -267,8 +272,8 @@ spider = Spider('http://www.mahua.com/xiaohua/1628976.htm')
 def test(id):
     result = response.get_response()
     soup = BeautifulSoup(result.text, "lxml")
-    now = time.strftime('[%Y-%m-%d %H:%M:%S]',time.localtime(time.time()))
-    print(now, id, threading.current_thread().ident, int(spider._redis.get(result.url).decode()), soup.select('h1'))
+    now = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
+    print(now, id, threading.current_thread().ident, soup.select('h1'))
     with open('log.txt', 'a') as f:
         f.write('{0} {1} {2} {3}\n'.format(now, id, threading.current_thread().ident, soup.select('h1')))
 
