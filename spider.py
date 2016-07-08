@@ -245,6 +245,9 @@ class Spider(object):
         task = Task(start_url)
         self.push_task(task)
 
+    def set_config(config={}):
+        pass
+
     def route(self, url):
         def _deco(func):
             self.r.add(url, func)
