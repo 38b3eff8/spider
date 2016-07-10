@@ -7,8 +7,8 @@ import time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
-int_number = re.compile('^[+,1]{0,1}\d+')
-float_number = re.compile('^[+,-]{0,1}\d+.{0,1}\d+$')
+int_number = re.compile('^[+,-]?\d+')
+float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
@@ -40,7 +40,7 @@ class Route(object):
     def get_func(self, url):
         node = self.root
         args = {}
-        if type(url) != type(''):
+        if not isinstance(url, ''):
             return None, args
         urls = [url for url in urlparse(url).path.split('/') if url != '']
 
@@ -109,9 +109,9 @@ class Node(object):
         result = re.match(self.pattern, sub_url)
 
         funcs = {
-            'int': lambda result: int(result.group(1)),
-            'string': lambda result: result.group(1),
-            'float': lambda result: float(result.group(1))
+            'int': lambda param: int(param.group(1)),
+            'string': lambda param: param.group(1),
+            'float': lambda param: float(param.group(1))
         }
 
         if result is None:
@@ -144,7 +144,7 @@ class Worker(threading.Thread):
     def run(self):
         while True:
             if self.spider is None:
-                # 记得错误处理
+                # todo 记得错误处理
                 return
 
             task = self.spider.pop_task()
@@ -161,16 +161,13 @@ class Worker(threading.Thread):
             for a in soup.select('a'):
                 href = a.get('href')
                 sub_url = self.convert(href, url)
-                if type(sub_url) != type('') or not sub_url.startswith('http'):
+                if not isinstance(sub_url, '') or not sub_url.startswith('http'):
                     continue
 
-                # 暂时放弃https的页面
+                # todo 暂时放弃https的页面
                 if sub_url.startswith('https'):
                     continue
 
-                # 这个地方还需要修改，去除不必要的url，从route里面找
-                # if not self.spider.r.search(sub_url):
-                #     continue
                 sub_task = Task(sub_url)
                 self.spider.push_task(sub_task)
 
@@ -180,7 +177,8 @@ class Worker(threading.Thread):
             response.add_response(threading.get_ident(), r)
             func(**args)
 
-    def convert(self, href, url):
+    @staticmethod
+    def convert(href, url):
         parse_result = urlparse(url)
         href_result = urlparse(href)
 
@@ -243,8 +241,9 @@ class Spider(object):
         task = Task(start_url)
         self.push_task(task)
 
-    def set_config(config={}):
-        pass
+    def set_config(self, config=None):
+        if not config:
+            return
 
     def route(self, url):
         def _deco(func):
