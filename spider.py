@@ -1,5 +1,3 @@
-import queue
-import collections
 import threading
 import requests
 import re
