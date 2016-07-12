@@ -40,7 +40,7 @@ class Route(object):
     def get_func(self, url):
         node = self.root
         args = {}
-        if not isinstance(url, ''):
+        if not isinstance(url, str):
             return None, args
         urls = [url for url in urlparse(url).path.split('/') if url != '']
 
@@ -161,7 +161,7 @@ class Worker(threading.Thread):
             for a in soup.select('a'):
                 href = a.get('href')
                 sub_url = self.convert(href, url)
-                if not isinstance(sub_url, '') or not sub_url.startswith('http'):
+                if not isinstance(sub_url, str) or not sub_url.startswith('http'):
                     continue
 
                 # todo 暂时放弃https的页面
@@ -216,14 +216,17 @@ class RedisQueue(object):
         self._queue_lock = threading.Lock()
 
     def push_task(self, task, direct='left'):
-        self._queue_lock.acquire()
-        if not self._redis.get(task.url):
-            if direct == 'left':
-                self._redis.lpush('task_queue', pickle.dumps(task))
+
+        with self._queue_lock:
+            if not self._redis.get(task.url):
+                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Push  in', task.url))
+                if direct == 'left':
+                    self._redis.lpush('task_queue', pickle.dumps(task))
+                else:
+                    self._redis.rpush('task_queue', pickle.dumps(task))
+                self._redis.set(task.url, 1)
             else:
-                self._redis.rpush('task_queue', pickle.dumps(task))
-            self._redis.set(task.url, 1)
-        self._queue_lock.release()
+                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Not push', task.url))
 
     def pop_task(self):
         task = self._redis.rpop('task_queue')
@@ -273,7 +276,7 @@ def test(id):
     result = response.get_response()
     soup = BeautifulSoup(result.text, "lxml")
     now = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
-    print(now, id, threading.current_thread().ident, soup.select('h1'))
+    # print(now, id, threading.current_thread().ident, soup.select('h1'))
     with open('log.txt', 'a') as f:
         f.write('{0} {1} {2} {3}\n'.format(now, id, threading.current_thread().ident, soup.select('h1')))
 
