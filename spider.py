@@ -153,7 +153,7 @@ class Worker(threading.Thread):
             url = task.url
 
             # todo 标记该网页已经被爬过
-            r = requests.get(url)
+            r = requests.get(url, headers=self.spider.config.get('headers'))
             if r.status_code != 200:
                 pass
 
@@ -162,10 +162,6 @@ class Worker(threading.Thread):
                 href = a.get('href')
                 sub_url = self.convert(href, url)
                 if not isinstance(sub_url, str) or not sub_url.startswith('http'):
-                    continue
-
-                # todo 暂时放弃https的页面
-                if sub_url.startswith('https'):
                     continue
 
                 sub_task = Task(sub_url)
@@ -182,15 +178,18 @@ class Worker(threading.Thread):
         parse_result = urlparse(url)
         href_result = urlparse(href)
 
-        if parse_result.netloc != href_result.netloc:
-            return None
+        # todo: 过滤站外链接
 
-        if href_result.scheme != '':
-            return href_result.geturl()
-        elif href_result.netloc != '':
-            return parse_result.scheme + "://" + href_result.geturl().replace('//', '')
-        else:
+        if href_result.netloc == '':
             return parse_result.scheme + "://" + parse_result.netloc + href_result.geturl()
+        else:
+            if href_result.netloc == parse_result.netloc:
+                if href_result.scheme != '':
+                    return href
+                else:
+                    return parse_result.scheme + "://" + href
+            else:
+                return None
 
 
 class Task(object):
@@ -199,10 +198,18 @@ class Task(object):
         self.url = url
 
 
+user_agents = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.106 Safari/537.36",
+]
+
+
 class Config(object):
     def __init__(self):
         self.config = {
-            'worker': 5
+            'worker': 5,
+            'headers': {
+                "user-agent": user_agents[0]
+            }
         }
 
     def get(self, key):
@@ -219,14 +226,14 @@ class RedisQueue(object):
 
         with self._queue_lock:
             if not self._redis.get(task.url):
-                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Push  in', task.url))
+                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Push__in', task.url))
                 if direct == 'left':
                     self._redis.lpush('task_queue', pickle.dumps(task))
                 else:
                     self._redis.rpush('task_queue', pickle.dumps(task))
                 self._redis.set(task.url, 1)
             else:
-                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Not push', task.url))
+                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Not_push', task.url))
 
     def pop_task(self):
         task = self._redis.rpop('task_queue')
@@ -268,9 +275,10 @@ class Spider(object):
         return self.task_queue.pop_task()
 
 
-spider = Spider('http://www.mahua.com/xiaohua/1628976.htm')
+# spider = Spider('http://www.mahua.com/xiaohua/1628976.htm')
+spider = Spider('https://www.zhihu.com')
 
-
+'''
 @spider.route('/xiaohua/<int:id>.htm')
 def test(id):
     result = response.get_response()
@@ -279,6 +287,13 @@ def test(id):
     # print(now, id, threading.current_thread().ident, soup.select('h1'))
     with open('log.txt', 'a') as f:
         f.write('{0} {1} {2} {3}\n'.format(now, id, threading.current_thread().ident, soup.select('h1')))
+'''
+
+
+@spider.route('/question/<int:id>')
+def test(id):
+    r = response.get_response()
+    print(r.status_code, '\t', r.url)
 
 
 # test main
