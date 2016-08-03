@@ -93,3 +93,4 @@ ENV/
 /app_test/
 /app_test.py
 /.vscode
+log.txt

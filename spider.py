@@ -152,7 +152,6 @@ class Worker(threading.Thread):
                 continue
             url = task.url
 
-            # todo 标记该网页已经被爬过
             r = requests.get(url, headers=self.spider.config.get('headers'))
             if r.status_code != 200:
                 pass
@@ -161,7 +160,7 @@ class Worker(threading.Thread):
             for a in soup.select('a'):
                 href = a.get('href')
                 sub_url = self.convert(href, url)
-                if not isinstance(sub_url, str) or not sub_url.startswith('http'):
+                if not isinstance(sub_url, str):
                     continue
 
                 sub_task = Task(sub_url)
@@ -175,7 +174,18 @@ class Worker(threading.Thread):
 
     @staticmethod
     def convert(href, url):
-        return urljoin(url, href)
+        href = urljoin(url, href)
+
+        url_result = urlparse(url)
+        href_result = urlparse(href)
+
+        if href_result.netloc == url_result.netloc:
+            if href_result.scheme == url_result.scheme:
+                return href
+            else:
+                return href.replace(href_result.scheme, url_result.scheme)
+        else:
+            return None
 
 
 class Task(object):
@@ -203,6 +213,9 @@ class Config(object):
 
 
 class RedisQueue(object):
+    _VIEW_URL = 'view_url'
+    _TASK_QUEUE = 'task_queue'
+
     def __init__(self, host='localhost', port=6379, db=0):
         self._redis = redis.Redis(host, port, db)
         self._redis.flushall()
@@ -211,21 +224,24 @@ class RedisQueue(object):
     def push_task(self, task, direct='left'):
 
         with self._queue_lock:
-            if not self._redis.get(task.url):
+            if not self._redis.sismember(RedisQueue._VIEW_URL, task.url):
+                self._redis.sadd(RedisQueue._VIEW_URL, task.url)
                 print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Push__in', task.url))
                 if direct == 'left':
-                    self._redis.lpush('task_queue', pickle.dumps(task))
+                    self._redis.lpush(RedisQueue._TASK_QUEUE, pickle.dumps(task))
                 else:
-                    self._redis.rpush('task_queue', pickle.dumps(task))
-                self._redis.set(task.url, 1)
+                    self._redis.rpush(RedisQueue._TASK_QUEUE, pickle.dumps(task))
             else:
                 print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Not_push', task.url))
 
     def pop_task(self):
-        task = self._redis.rpop('task_queue')
+        task = self._redis.rpop(RedisQueue._TASK_QUEUE)
         if task is not None:
             task = pickle.loads(task)
         return task
+
+    def is_view_url(self, url):
+        return self._redis.sismember(RedisQueue._VIEW_URL, url)
 
 
 class Spider(object):
@@ -261,7 +277,6 @@ class Spider(object):
         return self.task_queue.pop_task()
 
 
-# spider = Spider('http://www.mahua.com/xiaohua/1628976.htm')
 spider = Spider('https://www.zhihu.com')
 
 
@@ -270,13 +285,16 @@ def test(id):
     r = response.get_response()
     soup = BeautifulSoup(r.text, "lxml")
     now = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
-    # print(now, id, threading.current_thread().ident, soup.select('h1'))
     title_tag = soup.select('.zm-item-title span')
-    title = str(title_tag[0].string) if title_tag else ''
     with open('log.txt', 'a') as f:
-        f.write('{0} {1} {2} {3}\n'.format(now, id, threading.current_thread().ident, title))
+        f.write('{0} {1} {2} {3}\t{4}\n'.format(
+            now,
+            id,
+            threading.current_thread().ident,
+            title_tag[0].string if title_tag else '',
+            r.url)
+        )
 
 
-# test main
 if __name__ == '__main__':
     spider.run()
