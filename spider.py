@@ -4,7 +4,7 @@ import re
 import redis
 import pickle
 import time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 
 int_number = re.compile('^[+,-]?\d+')
@@ -175,21 +175,7 @@ class Worker(threading.Thread):
 
     @staticmethod
     def convert(href, url):
-        parse_result = urlparse(url)
-        href_result = urlparse(href)
-
-        # todo: 过滤站外链接
-
-        if href_result.netloc == '':
-            return parse_result.scheme + "://" + parse_result.netloc + href_result.geturl()
-        else:
-            if href_result.netloc == parse_result.netloc:
-                if href_result.scheme != '':
-                    return href
-                else:
-                    return parse_result.scheme + "://" + href
-            else:
-                return None
+        return urljoin(url, href)
 
 
 class Task(object):
@@ -278,22 +264,17 @@ class Spider(object):
 # spider = Spider('http://www.mahua.com/xiaohua/1628976.htm')
 spider = Spider('https://www.zhihu.com')
 
-'''
-@spider.route('/xiaohua/<int:id>.htm')
-def test(id):
-    result = response.get_response()
-    soup = BeautifulSoup(result.text, "lxml")
-    now = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
-    # print(now, id, threading.current_thread().ident, soup.select('h1'))
-    with open('log.txt', 'a') as f:
-        f.write('{0} {1} {2} {3}\n'.format(now, id, threading.current_thread().ident, soup.select('h1')))
-'''
-
 
 @spider.route('/question/<int:id>')
 def test(id):
     r = response.get_response()
-    print(r.status_code, '\t', r.url)
+    soup = BeautifulSoup(r.text, "lxml")
+    now = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
+    # print(now, id, threading.current_thread().ident, soup.select('h1'))
+    title_tag = soup.select('.zm-item-title span')
+    title = str(title_tag[0].string) if title_tag else ''
+    with open('log.txt', 'a') as f:
+        f.write('{0} {1} {2} {3}\n'.format(now, id, threading.current_thread().ident, title))
 
 
 # test main
