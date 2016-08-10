@@ -12,6 +12,7 @@ float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
+
     def __init__(self):
         self.root = Node('/')
 
@@ -83,6 +84,7 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 
 class Node(object):
+
     def __init__(self, name, func=None):
         self.name = name
         self.sub_node = {}
@@ -94,11 +96,13 @@ class Node(object):
             self.param_name = result.group(2)
 
             if self.param_type == 'int':
-                self.pattern = re.sub('<int:\w+>', '([+,-]{0,1}\d+)', self.name)
+                self.pattern = re.sub(
+                    '<int:\w+>', '([+,-]{0,1}\d+)', self.name)
             elif self.param_type == 'string':
                 self.pattern = re.sub('<string:\w+>', '\w+', self.name)
             elif self.param_type == 'float':
-                self.pattern = re.sub('<float:\w+>', '([+,-]{0,1}\d+.{0,1}\d+)', self.name)
+                self.pattern = re.sub(
+                    '<float:\w+>', '([+,-]{0,1}\d+.{0,1}\d+)', self.name)
         else:
             self.param_type = 'base'
 
@@ -123,6 +127,7 @@ class Node(object):
 
 
 class Response(object):
+
     def __init__(self):
         self.req = {}
 
@@ -137,6 +142,7 @@ response = Response()
 
 
 class Worker(threading.Thread):
+
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
@@ -179,16 +185,19 @@ class Worker(threading.Thread):
         url_result = urlparse(url)
         href_result = urlparse(href)
 
-        if href_result.netloc == url_result.netloc:
-            if href_result.scheme == url_result.scheme:
-                return href
-            else:
-                return href.replace(href_result.scheme, url_result.scheme)
+        # if href_result.netloc == url_result.netloc:
+        #    if href_result.scheme == url_result.scheme:
+        #        return href
+        #    else:
+        #        return href.replace(href_result.scheme, url_result.scheme)
+        if href_result.netloc == url_result.netloc and href_result.scheme == url_result.scheme:
+            return href
         else:
             return None
 
 
 class Task(object):
+
     def __init__(self, url, type=None):
         self.type = type
         self.url = url
@@ -200,6 +209,7 @@ user_agents = [
 
 
 class Config(object):
+
     def __init__(self):
         self.config = {
             'worker': 5,
@@ -226,13 +236,17 @@ class RedisQueue(object):
         with self._queue_lock:
             if not self._redis.sismember(RedisQueue._VIEW_URL, task.url):
                 self._redis.sadd(RedisQueue._VIEW_URL, task.url)
-                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Push__in', task.url))
+                print('{0}\t{1}\t{2}\t{3}'.format(
+                    direct, self._redis.get(task.url), 'Push__in', task.url))
                 if direct == 'left':
-                    self._redis.lpush(RedisQueue._TASK_QUEUE, pickle.dumps(task))
+                    self._redis.lpush(RedisQueue._TASK_QUEUE,
+                                      pickle.dumps(task))
                 else:
-                    self._redis.rpush(RedisQueue._TASK_QUEUE, pickle.dumps(task))
+                    self._redis.rpush(RedisQueue._TASK_QUEUE,
+                                      pickle.dumps(task))
             else:
-                print('{0}\t{1}\t{2}\t{3}'.format(direct, self._redis.get(task.url), 'Not_push', task.url))
+                print('{0}\t{1}\t{2}\t{3}'.format(
+                    direct, self._redis.get(task.url), 'Not_push', task.url))
 
     def pop_task(self):
         task = self._redis.rpop(RedisQueue._TASK_QUEUE)
@@ -245,6 +259,7 @@ class RedisQueue(object):
 
 
 class Spider(object):
+
     def __init__(self, start_url):
         self.config = Config()
         self.r = Route()
