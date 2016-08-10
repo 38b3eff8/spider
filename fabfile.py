@@ -1,4 +1,4 @@
-from fabric.api import local, cd, env
+from fabric.api import local, cd, env, run
 
 env.hosts = ['zhouyifan.top']
 
@@ -16,6 +16,7 @@ def commit():
 
 
 def deploy():
+    prepare_deploy()
     code_dir = '/home/zhouyifan/spider'
     with cd(code_dir):
         run("git pull")
