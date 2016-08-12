@@ -104,6 +104,7 @@ class Pinger(object):
         """
         icmp = socket.getprotobyname("icmp")
         try:
+            print("Ping to %s..." % self.target_host,)
             sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
         except socket.error as error:
             if error.errno == 1:

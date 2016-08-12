@@ -1,7 +1,12 @@
+import sys
+sys.path.append('..')
+
 from spider import Spider, response
 
 from bs4 import BeautifulSoup
 import redis
+import task
+
 
 spider = Spider('http://www.xicidaili.com/nt/1')
 
@@ -31,6 +36,8 @@ def nt_page(id):
         else:
             city = ''
         proxy_type = td_list[4].text
+        # todo: 这里传入的参数需要改为一个对象
+        task.check_ip.delay(ip)
 
 
 if __name__ == '__main__':
