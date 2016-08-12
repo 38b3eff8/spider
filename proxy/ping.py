@@ -10,7 +10,6 @@ import struct
 import select
 import time
 
-
 ICMP_ECHO_REQUEST = 8  # Platform specific
 DEFAULT_TIMEOUT = 2
 DEFAULT_COUNT = 4
@@ -34,18 +33,18 @@ class Pinger(object):
         while count < max_count:
             val = source_string[count + 1] * \
                 256 + source_string[count]
-            sum = sum + val
-            sum = sum & 0xffffffff
-            count = count + 2
+            sum += val
+            sum &= 0xffffffff
+            count += 2
 
         if max_count < len(source_string):
-            sum = sum + source_string[len(source_string) - 1]
-            sum = sum & 0xffffffff
+            sum += source_string[len(source_string) - 1]
+            sum &= 0xffffffff
 
         sum = (sum >> 16) + (sum & 0xffff)
-        sum = sum + (sum >> 16)
+        sum += sum >> 16
         answer = ~sum
-        answer = answer & 0xffff
+        answer &= 0xffff
         answer = answer >> 8 | (answer << 8 & 0xff00)
         return answer
 
@@ -58,7 +57,7 @@ class Pinger(object):
             start_time = time.time()
             readable = select.select([sock], [], [], time_remaining)
             time_spent = (time.time() - start_time)
-            if readable[0] == []:  # Timeout
+            if not readable[0]:  # Timeout
                 return
 
             time_received = time.time()
@@ -68,16 +67,16 @@ class Pinger(object):
                 "bbHHh", icmp_header
             )
             if packet_ID == ID:
-                bytes_In_double = struct.calcsize("d")
+                bytes_in_double = struct.calcsize("d")
                 time_sent = struct.unpack(
-                    "d", recv_packet[28:28 + bytes_In_double])[0]
+                    "d", recv_packet[28:28 + bytes_in_double])[0]
                 return time_received - time_sent
 
             time_remaining = time_remaining - time_spent
             if time_remaining <= 0:
                 return
 
-    def send_ping(self, sock,  ID):
+    def send_ping(self, sock, ID):
         """
         Send ping to the target host
         """
@@ -85,8 +84,8 @@ class Pinger(object):
 
         # Create a dummy heder with a 0 checksum.
         header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, my_checksum, ID, 1)
-        bytes_In_double = struct.calcsize("d")
-        data = (192 - bytes_In_double) * "Q"
+        bytes_in_double = struct.calcsize("d")
+        data = (192 - bytes_in_double) * "Q"
         data = struct.pack("d", time.time()) + \
             struct.pack(str(len(data)) + 's', data.encode('ascii'))
 
@@ -104,7 +103,7 @@ class Pinger(object):
         """
         icmp = socket.getprotobyname("icmp")
         try:
-            print("Ping to %s..." % self.target_host,)
+            print("Ping to %s..." % self.target_host, )
             sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
         except socket.error as error:
             if error.errno == 1:
@@ -126,17 +125,17 @@ class Pinger(object):
         Run the ping process
         """
         for i in range(self.count):
-            print("Ping to %s..." % self.target_host,)
+            print("Ping to %s..." % self.target_host, )
             try:
                 delay = self.ping_once()
             except socket.gaierror as e:
                 print("Ping failed. (socket error: '%s')" % e[1])
                 break
 
-            if delay == None:
+            if delay is None:
                 print("Ping failed. (timeout within %ssec.)" % self.timeout)
             else:
-                delay = delay * 1000
+                delay *= 1000
                 print("Get pong in %0.4fms" % delay)
 
 

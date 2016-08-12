@@ -7,3 +7,5 @@ fabfile.pyc
 /.vscode
 log.txt
 /helper.py
+/proxy/secret.py
+test.*
