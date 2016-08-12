@@ -236,8 +236,9 @@ class RedisQueue(object):
         with self._queue_lock:
             if not self._redis.sismember(RedisQueue._VIEW_URL, task.url):
                 self._redis.sadd(RedisQueue._VIEW_URL, task.url)
-                print('{0}\t{1}\t{2}\t{3}'.format(
-                    direct, self._redis.get(task.url), 'Push__in', task.url))
+                # print('{0}\t{1}\t{2}\t{3}'.format(
+                #     direct, self._redis.get(task.url), 'Push__in', task.url)
+                # )
                 if direct == 'left':
                     self._redis.lpush(RedisQueue._TASK_QUEUE,
                                       pickle.dumps(task))
@@ -245,8 +246,10 @@ class RedisQueue(object):
                     self._redis.rpush(RedisQueue._TASK_QUEUE,
                                       pickle.dumps(task))
             else:
-                print('{0}\t{1}\t{2}\t{3}'.format(
-                    direct, self._redis.get(task.url), 'Not_push', task.url))
+                # print('{0}\t{1}\t{2}\t{3}'.format(
+                #     direct, self._redis.get(task.url), 'Not_push', task.url)
+                # )
+                pass
 
     def pop_task(self):
         task = self._redis.rpop(RedisQueue._TASK_QUEUE)
@@ -290,26 +293,3 @@ class Spider(object):
 
     def pop_task(self):
         return self.task_queue.pop_task()
-
-
-spider = Spider('https://www.zhihu.com')
-
-
-@spider.route('/question/<int:id>')
-def test(id):
-    r = response.get_response()
-    soup = BeautifulSoup(r.text, "lxml")
-    now = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
-    title_tag = soup.select('.zm-item-title span')
-    with open('log.txt', 'a') as f:
-        f.write('{0} {1} {2} {3}\t{4}\n'.format(
-            now,
-            id,
-            threading.current_thread().ident,
-            title_tag[0].string if title_tag else '',
-            r.url)
-        )
-
-
-if __name__ == '__main__':
-    spider.run()
