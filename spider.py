@@ -12,6 +12,7 @@ float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
+
     def __init__(self):
         self.root = Node('/')
 
@@ -83,6 +84,7 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 
 class Node(object):
+
     def __init__(self, name, func=None):
         self.name = name
         self.sub_node = {}
@@ -125,6 +127,7 @@ class Node(object):
 
 
 class Response(object):
+
     def __init__(self):
         self.req = {}
 
@@ -139,6 +142,7 @@ response = Response()
 
 
 class Worker(threading.Thread):
+
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
@@ -193,6 +197,7 @@ class Worker(threading.Thread):
 
 
 class Task(object):
+
     def __init__(self, url, type=None):
         self.type = type
         self.url = url
@@ -204,6 +209,7 @@ user_agents = [
 
 
 class Config(object):
+
     def __init__(self):
         self.config = {
             'worker': 5,
@@ -256,6 +262,7 @@ class RedisQueue(object):
 
 
 class Spider(object):
+
     def __init__(self, start_url):
         self.config = Config()
         self.r = Route()
@@ -273,6 +280,10 @@ class Spider(object):
             self.r.add(url, func)
 
         return _deco
+
+    def proxy(self):
+        def _deco(func):
+            self.get_proxy = func
 
     def run(self):
         for i in range(self.config.get('worker')):
