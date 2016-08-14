@@ -4,7 +4,7 @@ sys.path.append('..')
 from bs4 import BeautifulSoup
 
 import redis
-from spider import Spider, response, Proxy
+from spider.spider import Spider, response, Proxy
 import task
 
 from sqlalchemy import func
@@ -12,15 +12,23 @@ from model import Session, ProxyIP
 
 spider = Spider('http://www.xicidaili.com/nt/1')
 
+spider.set_config({
+    "proxy": True,
+    "worker": 1
+})
+
 
 @spider.proxy
 def get_proxy():
     session = Session()
 
-    proxy_ip = session.query(ProxyIP).filter(ProxyIP.delay <= 200).order_by(func.random()).first()
+    proxy_ip = session.query(ProxyIP).filter(
+        ProxyIP.delay <= 200).order_by(func.random()).first()
+
+    print("get proxy", proxy_ip)
 
     if proxy_ip:
-        return Proxy(proxy_ip.ip, proxy_ip.prot, proxy_ip.proxy_type)
+        return Proxy(proxy_ip.ip, proxy_ip.port, proxy_ip.proxy_type)
     else:
         return None
 
@@ -62,4 +70,5 @@ def nt_page(id):
 
 
 if __name__ == '__main__':
-    spider.run()
+    # spider.run()
+    pass

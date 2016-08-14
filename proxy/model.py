@@ -1,9 +1,10 @@
-from secret import CONNECT_STRING
+# from secret import CONNECT_STRING
 
 from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+CONNECT_STRING = 'postgresql+psycopg2://postgres:xz879y43@localhost/proxy'
 engine = create_engine(CONNECT_STRING)
 Base = declarative_base()
 Session = sessionmaker(bind=engine)

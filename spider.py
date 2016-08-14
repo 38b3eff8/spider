@@ -14,7 +14,6 @@ float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
-
     def __init__(self):
         self.root = Node('/')
 
@@ -86,7 +85,6 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 
 class Node(object):
-
     def __init__(self, name, func=None):
         self.name = name
         self.sub_node = {}
@@ -129,7 +127,6 @@ class Node(object):
 
 
 class Response(object):
-
     def __init__(self):
         self.req = {}
 
@@ -144,7 +141,6 @@ response = Response()
 
 
 class Proxy(object):
-
     def __init__(self, ip, port, proxy_type):
         self.ip = ip
         self.port = port
@@ -152,10 +148,20 @@ class Proxy(object):
 
 
 class Worker(threading.Thread):
-
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
+
+        self.kwargs = {
+            "headers": self.spider.get_config('headers')
+        }
+
+        if self.spider.get_config('proxy'):
+            proxy = self.spider.get_proxy()
+            if proxy:
+                self.kwargs['proxies'] = {
+                    proxy.proxy_type: '{0}://{1}:{2}'.format(proxy.proxy_type, proxy.ip, proxy.port)
+                }
 
     def run(self):
         while True:
@@ -168,20 +174,11 @@ class Worker(threading.Thread):
                 continue
             url = task.url
 
-            kwargs = {
-                headers: self.spider.config.get('headers')
-            }
-
-            if self.spider.config.get('proxy'):
-                proxy = self.spider.get_proxy()
-                if proxy:
-                    kwargs['proxies'] = {
-                        proxy.proxy_type: '{0}://{1}:{2}'.format(proxy.proxy_type, proxy.ip, proxy.port)
-                    }
-
-            r = requests.get(url, **kwargs)
+            r = requests.get(url, **self.kwargs)
             if r.status_code != 200:
                 pass
+
+            print(r.text)
 
             soup = BeautifulSoup(r.text, "lxml")
             for a in soup.select('a'):
@@ -206,11 +203,6 @@ class Worker(threading.Thread):
         url_result = urlparse(url)
         href_result = urlparse(href)
 
-        # if href_result.netloc == url_result.netloc:
-        #    if href_result.scheme == url_result.scheme:
-        #        return href
-        #    else:
-        #        return href.replace(href_result.scheme, url_result.scheme)
         if href_result.netloc == url_result.netloc and href_result.scheme == url_result.scheme:
             return href
         else:
@@ -218,21 +210,31 @@ class Worker(threading.Thread):
 
 
 class Task(object):
-
     def __init__(self, url, type=None):
         self.type = type
         self.url = url
 
 
 class Config(object):
-
     def __init__(self):
-        with open("default_config.json", 'r') as f:
+        import os
+        with open(os.path.split(os.path.realpath(__file__))[0] + "/default_config.json", 'r') as f:
             self.config = json.load(f)
-            print(self.config)
 
-    def get(self, key):
+    def get_config(self, key):
         return self.config.get(key)
+
+    def set_config(self, config):
+        if isinstance(config, dict):
+            Config._add_config(self.config, config)
+
+    @staticmethod
+    def _add_config(default_config, config):
+        for key, value in config.items():
+            if isinstance(value, dict):
+                Config._add_config(default_config[key], value)
+            else:
+                default_config[key] = value
 
 
 class RedisQueue(object):
@@ -275,29 +277,32 @@ class RedisQueue(object):
 
 
 class Spider(object):
-
     def __init__(self, start_url):
-        self.config = Config()
+        self._config = Config()
         self.r = Route()
         self.task_queue = RedisQueue()
 
         task = Task(start_url)
         self.push_task(task)
 
-    def set_config(self, config=None):
-        if not config:
-            return
+    def set_config(self, config):
+        self._config.set_config(config)
+
+    def get_config(self, key):
+        return self._config.get_config(key)
+
+    def show_config(self):
+        import pprint
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(self._config.config)
 
     def route(self, url):
-        print(url)
-
         def _wrapper(func):
             self.r.add(url, func)
 
         return _wrapper
 
     def proxy(self, func):
-        print(func)
         self.get_proxy = func
 
         def _wrapper():
@@ -306,7 +311,7 @@ class Spider(object):
         return _wrapper
 
     def run(self):
-        for i in range(self.config.get('worker')):
+        for i in range(self.get_config('worker')):
             Worker(self).start()
 
     def push_task(self, task):
