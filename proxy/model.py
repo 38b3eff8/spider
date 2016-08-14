@@ -1,6 +1,6 @@
 from secret import CONNECT_STRING
 
-from sqlalchemy import create_engine, Column, String, Integer, Float
+from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -20,6 +20,9 @@ class ProxyIP(Base):
     proxy_type = Column(String)
     delay = Column(Float)
 
+    created_at = Column(DateTime(timezone=True))
+    updated_at = Column(DateTime(timezone=True))
+
     def load_attr(self, proxy_ip_dict):
         if 'ip' in proxy_ip_dict:
             self.ip = proxy_ip_dict['ip']
@@ -37,7 +40,7 @@ class ProxyIP(Base):
             self.proxy_type = proxy_ip_dict['proxy_type']
 
     def __repr__(self):
-        return "<ProxyIP(id={0} ip:port={1}:{2} country={3})".format(self.id, self.ip, self.port, self.country)
+        return "<ProxyIP(id={0} ip:port={1}:{2} country={3}) delay={4})>".format(self.id, self.ip, self.port, self.country, self.delay)
 
 
 if __name__ == '__main__':

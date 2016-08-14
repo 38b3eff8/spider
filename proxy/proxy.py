@@ -1,19 +1,28 @@
 import sys
 sys.path.append('..')
 
-from spider import Spider, response
-
 from bs4 import BeautifulSoup
+
 import redis
+from spider import Spider, response, Proxy
 import task
 
+from sqlalchemy import func
+from model import Session, ProxyIP
 
 spider = Spider('http://www.xicidaili.com/nt/1')
 
 
 @spider.proxy
 def get_proxy():
-    pass
+    session = Session()
+
+    proxy_ip = session.query(ProxyIP).filter(ProxyIP.delay <= 200).order_by(func.random()).first()
+
+    if proxy_ip:
+        return Proxy(proxy_ip.ip, proxy_ip.prot, proxy_ip.proxy_type)
+    else:
+        return None
 
 
 @spider.route('/nt/<int:id>')

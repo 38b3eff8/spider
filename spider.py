@@ -1,11 +1,13 @@
 import threading
-import requests
 import re
 import redis
 import pickle
+import json
 
 from urllib.parse import urlparse, urljoin
+
 from bs4 import BeautifulSoup
+import requests
 
 int_number = re.compile('^[+,-]?\d+')
 float_number = re.compile('^[+,-]?\d+.?\d+$')
@@ -141,6 +143,14 @@ class Response(object):
 response = Response()
 
 
+class Proxy(object):
+
+    def __init__(self, ip, port, proxy_type):
+        self.ip = ip
+        self.port = port
+        self.proxy_type = proxy_type
+
+
 class Worker(threading.Thread):
 
     def __init__(self, spider):
@@ -158,7 +168,18 @@ class Worker(threading.Thread):
                 continue
             url = task.url
 
-            r = requests.get(url, headers=self.spider.config.get('headers'))
+            kwargs = {
+                headers: self.spider.config.get('headers')
+            }
+
+            if self.spider.config.get('proxy'):
+                proxy = self.spider.get_proxy()
+                if proxy:
+                    kwargs['proxies'] = {
+                        proxy.proxy_type: '{0}://{1}:{2}'.format(proxy.proxy_type, proxy.ip, proxy.port)
+                    }
+
+            r = requests.get(url, **kwargs)
             if r.status_code != 200:
                 pass
 
@@ -203,20 +224,12 @@ class Task(object):
         self.url = url
 
 
-user_agents = [
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.106 Safari/537.36",
-]
-
-
 class Config(object):
 
     def __init__(self):
-        self.config = {
-            'worker': 5,
-            'headers': {
-                "user-agent": user_agents[0]
-            }
-        }
+        with open("default_config.json", 'r') as f:
+            self.config = json.load(f)
+            print(self.config)
 
     def get(self, key):
         return self.config.get(key)
@@ -276,14 +289,21 @@ class Spider(object):
             return
 
     def route(self, url):
-        def _deco(func):
+        print(url)
+
+        def _wrapper(func):
             self.r.add(url, func)
 
-        return _deco
+        return _wrapper
 
-    def proxy(self):
-        def _deco(func):
-            self.get_proxy = func
+    def proxy(self, func):
+        print(func)
+        self.get_proxy = func
+
+        def _wrapper():
+            return func()
+
+        return _wrapper
 
     def run(self):
         for i in range(self.config.get('worker')):
