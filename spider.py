@@ -3,6 +3,7 @@ import re
 import redis
 import pickle
 import json
+import logging
 
 from urllib.parse import urlparse, urljoin
 
@@ -203,8 +204,6 @@ class Worker(threading.Thread):
             if r.status_code != 200:
                 pass
 
-            print(r.text)
-
             soup = BeautifulSoup(r.text, "lxml")
             for a in soup.select('a'):
                 href = a.get('href')
@@ -307,6 +306,8 @@ class Spider(object):
 
     def __init__(self, start_url):
         self._config = Config()
+        self._set_log_config()
+
         self.r = Route()
         self.task_queue = RedisQueue()
 
@@ -315,6 +316,8 @@ class Spider(object):
 
     def set_config(self, config):
         self._config.set_config(config)
+
+        self._set_log_config()
 
     def get_config(self, key):
         return self._config.get_config(key)
@@ -350,3 +353,22 @@ class Spider(object):
 
     def pop_task(self):
         return self.task_queue.pop_task()
+
+    def _set_log_config(self):
+        log_config = self.get_config('log')
+        filename = log_config.get('filename')
+
+        level_dict = {
+            "debug": logging.DEBUG,
+            "info": logging.INFO,
+            "warning": logging.WARNING,
+            "error": logging.ERROR,
+            "critical": logging.CRITICAL
+        }
+        log_level = log_config.get('level').lower()
+        log_format = log_config.get('format') | | '%(asctime)s %(message)s'
+        logging.basicConfig(
+            format=log_format,
+            filename=filename,
+            level=level_dict[log_level]
+        )

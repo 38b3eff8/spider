@@ -1,6 +1,5 @@
 import telnetlib
 from celery import Celery
-from sqlalchemy.dialects.postgresql import insert
 
 from ping import Pinger
 from model import Session, ProxyIP
@@ -30,7 +29,6 @@ def check_ip(proxy_ip_dict):
             )
         except Exception as e:
             return
-
 
         session = Session()
         proxy_ip = ProxyIP()

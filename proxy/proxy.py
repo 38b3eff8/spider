@@ -70,8 +70,6 @@ def nt_page(id):
             return
         proxy_ip_dict['proxy_type'] = proxy_type.lower()
 
-
-
         # todo: 这里传入的参数需要改为一个对象
         task.check_ip.delay(proxy_ip_dict)
         print(proxy_ip_dict['ip'])
