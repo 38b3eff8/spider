@@ -1,4 +1,6 @@
+import telnetlib
 from celery import Celery
+from sqlalchemy.dialects.postgresql import insert
 
 from ping import Pinger
 from model import Session, ProxyIP
@@ -20,6 +22,16 @@ def check_ip(proxy_ip_dict):
     delay = pinger.ping_once()
 
     if delay is not None:
+        try:
+            tn = telnetlib.Telnet(
+                proxy_ip_dict['ip'],
+                proxy_ip_dict['port'],
+                timeout=10
+            )
+        except Exception as e:
+            return
+
+
         session = Session()
         proxy_ip = ProxyIP()
         proxy_ip.load_attr(proxy_ip_dict)

@@ -14,6 +14,7 @@ float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
+
     def __init__(self):
         self.root = Node('/')
 
@@ -85,6 +86,7 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 
 class Node(object):
+
     def __init__(self, name, func=None):
         self.name = name
         self.sub_node = {}
@@ -127,6 +129,7 @@ class Node(object):
 
 
 class Response(object):
+
     def __init__(self):
         self.req = {}
 
@@ -141,13 +144,37 @@ response = Response()
 
 
 class Proxy(object):
-    def __init__(self, ip, port, proxy_type):
+
+    def __init__(self, ip, port, proxy_type, user=None, password=None):
         self.ip = ip
         self.port = port
         self.proxy_type = proxy_type
 
+        self.user = user
+        self.password = password
+
+    def get_proxies(self):
+        if self.user:
+            pattern = "{scheme}://{user}:{password}@{ip}:{port}"
+        else:
+            pattern = "{scheme}://{ip}:{port}"
+
+        proxy_str = pattern.format(**{
+            "scheme": self.proxy_type,
+            "ip": self.ip,
+            "port": self.port,
+            "user": self.user,
+            "password": self.password
+        })
+
+        return {
+            "http": proxy_str,
+            "https": proxy_str
+        }
+
 
 class Worker(threading.Thread):
+
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
@@ -159,9 +186,7 @@ class Worker(threading.Thread):
         if self.spider.get_config('proxy'):
             proxy = self.spider.get_proxy()
             if proxy:
-                self.kwargs['proxies'] = {
-                    proxy.proxy_type: '{0}://{1}:{2}'.format(proxy.proxy_type, proxy.ip, proxy.port)
-                }
+                self.kwargs['proxies'] = proxy.get_proxies()
 
     def run(self):
         while True:
@@ -210,12 +235,14 @@ class Worker(threading.Thread):
 
 
 class Task(object):
+
     def __init__(self, url, type=None):
         self.type = type
         self.url = url
 
 
 class Config(object):
+
     def __init__(self):
         import os
         with open(os.path.split(os.path.realpath(__file__))[0] + "/default_config.json", 'r') as f:
@@ -277,6 +304,7 @@ class RedisQueue(object):
 
 
 class Spider(object):
+
     def __init__(self, start_url):
         self._config = Config()
         self.r = Route()

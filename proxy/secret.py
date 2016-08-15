@@ -1,1 +1,1 @@
-CONNECT_STRING = 'postgresql+psycopg2://postgres:xz879y43@localhost/proxy'
+CONNECT_STRING = 'postgresql+psycopg2://zhouyifan:xz879y43@localhost/proxy'

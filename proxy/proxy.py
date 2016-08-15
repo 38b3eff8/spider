@@ -62,7 +62,15 @@ def nt_page(id):
             city = ''
         proxy_ip_dict['city'] = city
 
-        proxy_ip_dict['proxy_type'] = td_list[4].text
+        proxy_ip_dict['transparent'] = td_list[4].text
+
+        proxy_type = td_list[5].text
+        if proxy_type == 'socks4/5':
+
+            return
+        proxy_ip_dict['proxy_type'] = proxy_type.lower()
+
+
 
         # todo: 这里传入的参数需要改为一个对象
         task.check_ip.delay(proxy_ip_dict)
@@ -70,5 +78,4 @@ def nt_page(id):
 
 
 if __name__ == '__main__':
-    # spider.run()
-    pass
+    spider.run()
