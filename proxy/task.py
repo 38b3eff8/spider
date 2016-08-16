@@ -49,9 +49,19 @@ def check_ip(proxy_ip_dict):
             return
 
         session = Session()
-        proxy_ip = ProxyIP()
-        proxy_ip.load_attr(proxy_ip_dict)
-        proxy_ip.delay = delay * 1000
-        session.add(proxy_ip)
+
+        proxy_ip = session.query(ProxyIP).filter(
+            ProxyIP.ip == proxy_ip_dict['ip']
+        ).first()
+
+        if proxy_ip:
+            proxy_ip.delay = delay * 1000
+            proxy_ip.updated_at = func.now()
+        else:
+            proxy_ip = ProxyIP()
+            proxy_ip.load_attr(proxy_ip_dict)
+            proxy_ip.delay = delay * 1000
+            session.add(proxy_ip)
+
         session.commit()
         print('{ip} save success'.format(ip=proxy_ip_dict['ip']))
