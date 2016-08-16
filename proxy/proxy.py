@@ -12,9 +12,13 @@ from model import Session, ProxyIP
 
 spider = Spider('http://www.xicidaili.com/nt/1')
 
-spider.set_config({
-    "proxy": True,
-    "worker": 1
+spider.load_config_dict({
+    "proxy": {
+        "proxy": True,
+    },
+    "base": {
+        "worker": 1
+    }
 })
 
 
@@ -70,9 +74,7 @@ def nt_page(id):
             return
         proxy_ip_dict['proxy_type'] = proxy_type.lower()
 
-        # todo: 这里传入的参数需要改为一个对象
         task.check_ip.delay(proxy_ip_dict)
-        print(proxy_ip_dict['ip'])
 
 
 if __name__ == '__main__':

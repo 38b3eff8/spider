@@ -183,6 +183,7 @@ class Worker(threading.Thread):
         self._config = Config()
 
         headers = {}
+        print(self._config['headers'])
         for key, value in self._config['headers'].items():
             headers[key] = value
 
@@ -209,6 +210,7 @@ class Worker(threading.Thread):
             if task is None:
                 continue
             url = task.url
+            self.logger.debug('request headers: {headers}'.format(headers=self.kwargs['headers']))
             self.logger.info('start download page {url}'.format(url=url))
             r = requests.get(url, **self.kwargs)
             if r.status_code != 200:
@@ -258,7 +260,11 @@ class Config(object):
         if not hasattr(cls, '_instance'):
             cls._instance = super(Config, cls).__new__(cls)
             config = configparser.ConfigParser()
-            config.read('default.ini')
+
+            import os
+            config.read(
+                os.path.split(os.path.realpath(__file__))[0] + '/default.ini'
+            )
             cls._instance._config = config
 
         return cls._instance
@@ -390,7 +396,7 @@ class Spider(object):
 
         kwargs = {
             "level": level,
-            "format": '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+            "format": '[%(asctime)s - %(levelname)s - %(name)s] - %(message)s'
         }
 
         display = self._config.get('log', 'display', fallback='console')
