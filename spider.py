@@ -4,6 +4,7 @@ import redis
 import pickle
 import json
 import logging
+import configparser
 
 from urllib.parse import urlparse, urljoin
 
@@ -179,15 +180,24 @@ class Worker(threading.Thread):
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
+        self._config = Config()
+
+        headers = {}
+        for key, value in self._config['headers'].items():
+            headers[key] = value
 
         self.kwargs = {
-            "headers": self.spider.get_config('headers')
+            "headers": headers
         }
 
-        if self.spider.get_config('proxy'):
+        if self._config.getboolean('proxy', 'proxy', fallback=False):
             proxy = self.spider.get_proxy()
             if proxy:
                 self.kwargs['proxies'] = proxy.get_proxies()
+
+        self.logger = Spider.get_logger(
+            'worker-${id}'.format(id=threading.current_thread().ident)
+        )
 
     def run(self):
         while True:
@@ -199,10 +209,12 @@ class Worker(threading.Thread):
             if task is None:
                 continue
             url = task.url
-
+            self.logger.info('start download page ${url}'.format(url=url))
             r = requests.get(url, **self.kwargs)
             if r.status_code != 200:
                 pass
+
+            self.logger.info('download page success ${url}'.format(url=url))
 
             soup = BeautifulSoup(r.text, "lxml")
             for a in soup.select('a'):
@@ -242,25 +254,35 @@ class Task(object):
 
 class Config(object):
 
-    def __init__(self):
-        import os
-        with open(os.path.split(os.path.realpath(__file__))[0] + "/default_config.json", 'r') as f:
-            self.config = json.load(f)
+    def __new__(cls):
+        if not hasattr(cls, '_instance'):
+            cls._instance = super(Config, cls).__new__(cls)
+            config = configparser.ConfigParser()
+            config.read('default.ini')
+            cls._instance._config = config
 
-    def get_config(self, key):
-        return self.config.get(key)
+        return cls._instance
 
-    def set_config(self, config):
-        if isinstance(config, dict):
-            Config._add_config(self.config, config)
+    def __getitem__(self, key):
+        if key in self._config:
+            return self._config[key]
+        else:
+            return None
 
-    @staticmethod
-    def _add_config(default_config, config):
-        for key, value in config.items():
-            if isinstance(value, dict):
-                Config._add_config(default_config[key], value)
-            else:
-                default_config[key] = value
+    def read_files(self, filenames):
+        self._config.read(filenames)
+
+    def read_dict(self, d):
+        self._config.read_dict(d)
+
+    def get(self, *args, **kwargs):
+        return self._config.get(*args, **kwargs)
+
+    def getint(self, *args, **kwargs):
+        return self._config.getint(*args, **kwargs)
+
+    def getboolean(self, *args, **kwargs):
+        return self._config.getboolean(*args, **kwargs)
 
 
 class RedisQueue(object):
@@ -306,7 +328,6 @@ class Spider(object):
 
     def __init__(self, start_url):
         self._config = Config()
-        self._set_log_config()
 
         self.r = Route()
         self.task_queue = RedisQueue()
@@ -314,18 +335,15 @@ class Spider(object):
         task = Task(start_url)
         self.push_task(task)
 
-    def set_config(self, config):
-        self._config.set_config(config)
+    def load_config_file(self, filenames):
+        self._config.read_files(filenames)
 
-        self._set_log_config()
+        self._update_log_basicConfig()
 
-    def get_config(self, key):
-        return self._config.get_config(key)
+    def load_config_dict(self, d):
+        self._config.read_dict(d)
 
-    def show_config(self):
-        import pprint
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(self._config.config)
+        self._update_log_basicConfig()
 
     def route(self, url):
         def _wrapper(func):
@@ -342,7 +360,8 @@ class Spider(object):
         return _wrapper
 
     def run(self):
-        for i in range(self.get_config('worker')):
+        worker = self._config.getint('base', 'worker', fallback=5)
+        for i in range(worker):
             Worker(self).start()
 
     def push_task(self, task):
@@ -354,10 +373,7 @@ class Spider(object):
     def pop_task(self):
         return self.task_queue.pop_task()
 
-    def _set_log_config(self):
-        log_config = self.get_config('log')
-        filename = log_config.get('filename')
-
+    def _update_log_basicConfig(self):
         level_dict = {
             "debug": logging.DEBUG,
             "info": logging.INFO,
@@ -365,10 +381,30 @@ class Spider(object):
             "error": logging.ERROR,
             "critical": logging.CRITICAL
         }
-        log_level = log_config.get('level').lower()
-        log_format = log_config.get('format') | | '%(asctime)s %(message)s'
-        logging.basicConfig(
-            format=log_format,
-            filename=filename,
-            level=level_dict[log_level]
-        )
+
+        level = level_dict[
+            self._config.get('log', 'level', fallback='info').lower()
+        ]
+        # format = self._config.get('log', 'format')
+
+        kwargs = {
+            "level": level,
+            "format": '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+        }
+
+        display = self._config.get('log', 'display', fallback='console')
+        if display == 'file':
+            filename = self._config.get('log', 'filename')
+            kwargs['filename'] = filename
+
+        logging.basicConfig(**kwargs)
+
+    @staticmethod
+    def get_logger(name):
+        logger = logging.getLogger(name)
+        # config = Config()
+        # display = config.get('log', 'display', fallback='console')
+        #
+        # logger.addHandler(ch)
+
+        return logger

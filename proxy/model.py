@@ -1,10 +1,10 @@
-from secret import CONNECT_STRING
+from . import secret
 
 from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-engine = create_engine(CONNECT_STRING)
+engine = create_engine(secret.CONNECT_STRING)
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
 

@@ -10,11 +10,6 @@ from proxy.model import Session, ProxyIP
 
 spider = Spider('https://www.zhihu.com')
 
-spider.set_config({
-    "proxy": True,
-    "worker": 4
-})
-
 
 @spider.proxy
 def get_proxy():
