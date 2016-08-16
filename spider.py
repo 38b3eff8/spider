@@ -196,7 +196,7 @@ class Worker(threading.Thread):
                 self.kwargs['proxies'] = proxy.get_proxies()
 
         self.logger = Spider.get_logger(
-            'worker-${id}'.format(id=threading.current_thread().ident)
+            'worker_{id}'.format(id=threading.current_thread().ident)
         )
 
     def run(self):
@@ -209,12 +209,12 @@ class Worker(threading.Thread):
             if task is None:
                 continue
             url = task.url
-            self.logger.info('start download page ${url}'.format(url=url))
+            self.logger.info('start download page {url}'.format(url=url))
             r = requests.get(url, **self.kwargs)
             if r.status_code != 200:
                 pass
 
-            self.logger.info('download page success ${url}'.format(url=url))
+            self.logger.info('download page success {url}'.format(url=url))
 
             soup = BeautifulSoup(r.text, "lxml")
             for a in soup.select('a'):
@@ -328,6 +328,7 @@ class Spider(object):
 
     def __init__(self, start_url):
         self._config = Config()
+        self._update_log_basicConfig()
 
         self.r = Route()
         self.task_queue = RedisQueue()
@@ -396,6 +397,8 @@ class Spider(object):
         if display == 'file':
             filename = self._config.get('log', 'filename')
             kwargs['filename'] = filename
+
+        print(kwargs)
 
         logging.basicConfig(**kwargs)
 
