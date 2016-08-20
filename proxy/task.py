@@ -1,5 +1,6 @@
 import telnetlib
 from celery import Celery
+from sqlalchemy import func
 
 from ping import Pinger
 from model import Session, ProxyIP
