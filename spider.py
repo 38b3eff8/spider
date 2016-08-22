@@ -225,6 +225,8 @@ class Worker(threading.Thread):
                 if not isinstance(sub_url, str):
                     continue
 
+                # todo: 过滤
+
                 sub_task = Task(sub_url)
                 self.spider.push_task(sub_task)
 
@@ -392,7 +394,6 @@ class Spider(object):
         level = level_dict[
             self._config.get('log', 'level', fallback='info').lower()
         ]
-        # format = self._config.get('log', 'format')
 
         kwargs = {
             "level": level,
@@ -411,9 +412,10 @@ class Spider(object):
     @staticmethod
     def get_logger(name):
         logger = logging.getLogger(name)
-        # config = Config()
-        # display = config.get('log', 'display', fallback='console')
-        #
-        # logger.addHandler(ch)
-
         return logger
+
+    def filter(self, include=None, exclude=None):
+        if include:
+            self.include = include
+        elif exclude:
+            self.exclude = exclude
