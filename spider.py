@@ -5,6 +5,7 @@ import pickle
 import json
 import logging
 import configparser
+import queue
 
 from urllib.parse import urlparse, urljoin
 
@@ -89,10 +90,11 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 class Node(object):
 
-    def __init__(self, name, func=None):
+    def __init__(self, name, func=None, filter_type='include'):
         self.name = name
         self.sub_node = {}
         self.func = func
+        self.filter_type = filter_type
 
         result = param_re.match(name)
         if result:
@@ -203,14 +205,17 @@ class Worker(threading.Thread):
     def run(self):
         while True:
             if self.spider is None:
-                # todo 记得错误处理
                 return
 
             task = self.spider.pop_task()
             if task is None:
                 continue
             url = task.url
-            self.logger.debug('request headers: {headers}'.format(headers=self.kwargs['headers']))
+            self.logger.debug(
+                'request headers: {headers}'.format(
+                    headers=self.kwargs['headers']
+                )
+            )
             self.logger.info('start download page {url}'.format(url=url))
             r = requests.get(url, **self.kwargs)
             if r.status_code != 200:
@@ -224,8 +229,6 @@ class Worker(threading.Thread):
                 sub_url = self.convert(href, url)
                 if not isinstance(sub_url, str):
                     continue
-
-                # todo: 过滤
 
                 sub_task = Task(sub_url)
                 self.spider.push_task(sub_task)
@@ -293,6 +296,29 @@ class Config(object):
         return self._config.getboolean(*args, **kwargs)
 
 
+class BaseQueue(object):
+    pass
+
+
+class SimpleQueue(object):
+
+    def __init__(self):
+        self.queue = queue.PriorityQueue()
+        self.view_set = set()
+        self._queue_lock = threading.Lock()
+
+    def push_task(self, task, level=0):
+        with self._queue_lock:
+            self.view_set.add(task.url)
+            self.queue.put((-level, task))
+
+    def pop_task(self):
+        self.queue.get()
+
+    def is_view_url(self, url):
+        return url in self.view_set
+
+
 class RedisQueue(object):
     _VIEW_URL = 'view_url'
     _TASK_QUEUE = 'task_queue'
@@ -302,25 +328,21 @@ class RedisQueue(object):
         self._redis.flushall()
         self._queue_lock = threading.Lock()
 
-    def push_task(self, task, direct='left'):
+    def push_task(self, task, level=0):
 
         with self._queue_lock:
             if not self._redis.sismember(RedisQueue._VIEW_URL, task.url):
                 self._redis.sadd(RedisQueue._VIEW_URL, task.url)
-                # print('{0}\t{1}\t{2}\t{3}'.format(
-                #     direct, self._redis.get(task.url), 'Push__in', task.url)
-                # )
-                if direct == 'left':
-                    self._redis.lpush(RedisQueue._TASK_QUEUE,
-                                      pickle.dumps(task))
+                if level == 0:
+                    self._redis.lpush(
+                        RedisQueue._TASK_QUEUE,
+                        pickle.dumps(task)
+                    )
                 else:
-                    self._redis.rpush(RedisQueue._TASK_QUEUE,
-                                      pickle.dumps(task))
-            else:
-                # print('{0}\t{1}\t{2}\t{3}'.format(
-                #     direct, self._redis.get(task.url), 'Not_push', task.url)
-                # )
-                pass
+                    self._redis.rpush(
+                        RedisQueue._TASK_QUEUE,
+                        pickle.dumps(task)
+                    )
 
     def pop_task(self):
         task = self._redis.rpop(RedisQueue._TASK_QUEUE)
@@ -339,10 +361,14 @@ class Spider(object):
         self._update_log_basicConfig()
 
         self.r = Route()
-        self.task_queue = RedisQueue()
 
-        task = Task(start_url)
-        self.push_task(task)
+        queue_type = self._config.get('base', 'queue')
+        if queue_type == 'simple':
+            self.task_queue = SimpleQueue()
+        elif queue_type == 'redis':
+            self.task_queue = RedisQueue()
+
+        self.push_task(Task(start_url))
 
     def load_config_file(self, filenames):
         self._config.read_files(filenames)
@@ -374,9 +400,9 @@ class Spider(object):
             Worker(self).start()
 
     def push_task(self, task):
-        direct = 'left'
+        direct = 0
         if self.r.search(task.url):
-            direct = 'right'
+            direct = 1
         self.task_queue.push_task(task, direct)
 
     def pop_task(self):
