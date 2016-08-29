@@ -17,7 +17,6 @@ float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
-
     def __init__(self):
         self.root = Node('/')
 
@@ -25,55 +24,55 @@ class Route(object):
         node = self.root
 
         parse_result = urlparse(url)
-        urls = [url for url in parse_result.path.split('/') if url]
-        if len(urls) == 0:
+        parts = [part for part in parse_result.path.split('/') if part]
+        if len(parts) == 0:
             node.func = func
         else:
-            self._add(node, urls, func)
+            self._add(node, parts, func)
 
-    def _add(self, node, urls, func):
-        key = urls[0]
+    def _add(self, node, parts, func):
+        key = parts[0]
         keys = node.sub_node.keys()
         if key not in keys:
             node.sub_node[key] = Node(key, None)
 
-        if len(urls[1:]) > 0:
+        if len(parts[1:]) > 0:
             sub_node = node.sub_node.get(key)
-            self._add(sub_node, urls[1:], func)
+            self._add(sub_node, parts[1:], func)
         else:
             node.sub_node[key].func = func
 
-    def get_func(self, url):
-        node = self.root
+    def get_node(self, url):
+        parts = [part for part in urlparse(url).path.split('/') if part != '']
         args = {}
-        if not isinstance(url, str):
-            return None, args
-        urls = [url for url in urlparse(url).path.split('/') if url != '']
 
-        i = 0
-        while len(node.sub_node) > 0 and len(urls) > i:
-            sub_url = urls[i]
-            i += 1
-            for item in node.sub_node.values():
-                if item.param_type == 'base':
-                    if item.name != sub_url:
+        def _get_node(node, parts):
+            if not parts:
+                return None
+
+            part = parts[0]
+
+            for sub_node in node.sub_node.values():
+                if sub_node.param_type == 'base':
+                    if sub_node.name != part:
                         continue
                 else:
-                    value = item.get_value(sub_url)
+                    value = sub_node.get_value(part)
                     if value is None:
                         continue
-                    args[item.param_name] = value
-                node = item
-                break
+                    args[sub_node.param_name] = value
+                if not len(sub_node.sub_node):
+                    return sub_node
+                else:
+                    return _get_node(sub_node, parts[1:])
             else:
-                node = None
-                break
+                return None
 
-        if node is None or i < len(urls):
-            return None, args
-        else:
-            return node.func, args
+        return _get_node(self.root, parts), args
 
+    def get_func(self, url):
+        node = self.get_node(url)
+        
     def search(self, url):
         func, args = self.get_func(url)
         if func is None:
@@ -89,7 +88,6 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 
 class Node(object):
-
     def __init__(self, name, func=None, filter_type='include'):
         self.name = name
         self.sub_node = {}
@@ -102,13 +100,11 @@ class Node(object):
             self.param_name = result.group(2)
 
             if self.param_type == 'int':
-                self.pattern = re.sub(
-                    '<int:\w+>', '([+,-]{0,1}\d+)', self.name)
+                self.pattern = re.sub('<int:\w+>', '([+,-]{0,1}\d+)', self.name)
             elif self.param_type == 'string':
                 self.pattern = re.sub('<string:\w+>', '\w+', self.name)
             elif self.param_type == 'float':
-                self.pattern = re.sub(
-                    '<float:\w+>', '([+,-]{0,1}\d+.{0,1}\d+)', self.name)
+                self.pattern = re.sub('<float:\w+>', '([+,-]{0,1}\d+.{0,1}\d+)', self.name)
         else:
             self.param_type = 'base'
 
@@ -133,7 +129,6 @@ class Node(object):
 
 
 class Response(object):
-
     def __init__(self):
         self.req = {}
 
@@ -148,7 +143,6 @@ response = Response()
 
 
 class Proxy(object):
-
     def __init__(self, ip, port, proxy_type, user=None, password=None):
         self.ip = ip
         self.port = port
@@ -178,14 +172,12 @@ class Proxy(object):
 
 
 class Worker(threading.Thread):
-
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
         self._config = Config()
 
         headers = {}
-        print(self._config['headers'])
         for key, value in self._config['headers'].items():
             headers[key] = value
 
@@ -230,6 +222,8 @@ class Worker(threading.Thread):
                 if not isinstance(sub_url, str):
                     continue
 
+                # todo: filter
+
                 sub_task = Task(sub_url)
                 self.spider.push_task(sub_task)
 
@@ -253,14 +247,12 @@ class Worker(threading.Thread):
 
 
 class Task(object):
-
     def __init__(self, url, type=None):
         self.type = type
         self.url = url
 
 
 class Config(object):
-
     def __new__(cls):
         if not hasattr(cls, '_instance'):
             cls._instance = super(Config, cls).__new__(cls)
@@ -301,7 +293,6 @@ class BaseQueue(object):
 
 
 class SimpleQueue(object):
-
     def __init__(self):
         self.queue = queue.PriorityQueue()
         self.view_set = set()
@@ -355,7 +346,6 @@ class RedisQueue(object):
 
 
 class Spider(object):
-
     def __init__(self, start_url):
         self._config = Config()
         self._update_log_basicConfig()
@@ -430,8 +420,6 @@ class Spider(object):
         if display == 'file':
             filename = self._config.get('log', 'filename')
             kwargs['filename'] = filename
-
-        print(kwargs)
 
         logging.basicConfig(**kwargs)
 
