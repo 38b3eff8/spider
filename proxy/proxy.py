@@ -1,6 +1,5 @@
 from bs4 import BeautifulSoup
 
-import redis
 from spider.spider import Spider, response, Proxy
 import task
 
@@ -11,7 +10,7 @@ spider = Spider('http://www.xicidaili.com/nt/1')
 
 spider.load_config_dict({
     "proxy": {
-        "proxy": False,
+        "proxy": True,
     },
     "base": {
         "worker": 1
@@ -40,6 +39,7 @@ def nt_page(id):
     print('id: {0}'.format(id))
 
     resp = response.get_response()
+    print(resp.text)
     soup = BeautifulSoup(resp.text)
     ip_list = soup.select('#ip_list tr')
     for index in range(1, len(ip_list)):
@@ -68,7 +68,6 @@ def nt_page(id):
 
         proxy_type = td_list[5].text
         if proxy_type == 'socks4/5':
-
             return
         proxy_ip_dict['proxy_type'] = proxy_type.lower()
 
