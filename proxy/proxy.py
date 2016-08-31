@@ -1,6 +1,3 @@
-import sys
-sys.path.append('..')
-
 from bs4 import BeautifulSoup
 
 import redis
@@ -14,10 +11,13 @@ spider = Spider('http://www.xicidaili.com/nt/1')
 
 spider.load_config_dict({
     "proxy": {
-        "proxy": True,
+        "proxy": False,
     },
     "base": {
         "worker": 1
+    },
+    "log": {
+        "level": "DEBUG"
     }
 })
 
@@ -28,8 +28,6 @@ def get_proxy():
 
     proxy_ip = session.query(ProxyIP).filter(
         ProxyIP.delay <= 200).order_by(func.random()).first()
-
-    print("get proxy", proxy_ip)
 
     if proxy_ip:
         return Proxy(proxy_ip.ip, proxy_ip.port, proxy_ip.proxy_type)

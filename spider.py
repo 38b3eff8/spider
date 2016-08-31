@@ -17,11 +17,10 @@ float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
-
     def __init__(self):
         self.root = Node('/')
 
-    def add(self, url, func):
+    def add(self, url, func=None, filter_type='target'):
         node = self.root
 
         def _add(node, parts):
@@ -35,6 +34,7 @@ class Route(object):
                 _add(sub_node, parts[1:])
             else:
                 node.sub_node[key].func = func
+                node.filter_type = filter_type
 
         parse_result = urlparse(url)
         parts = [part for part in parse_result.path.split('/') if part]
@@ -93,7 +93,6 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 
 class Node(object):
-
     def __init__(self, name, func=None, filter_type='include'):
         self.name = name
         self.sub_node = {}
@@ -137,7 +136,6 @@ class Node(object):
 
 
 class Response(object):
-
     def __init__(self):
         self.req = {}
 
@@ -152,7 +150,6 @@ response = Response()
 
 
 class Proxy(object):
-
     def __init__(self, ip, port, proxy_type, user=None, password=None):
         self.ip = ip
         self.port = port
@@ -180,13 +177,19 @@ class Proxy(object):
             "https": proxy_str
         }
 
+    def __repr__(self):
+        return "<Proxy {proxy}>".format(proxy=self.get_proxies())
+
 
 class Worker(threading.Thread):
-
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
         self._config = Config()
+
+        self.logger = Spider.get_logger(
+            'worker_{id}'.format(id=threading.current_thread().ident)
+        )
 
         headers = {}
         for key, value in self._config['headers'].items():
@@ -196,14 +199,8 @@ class Worker(threading.Thread):
             "headers": headers
         }
 
-        if self._config.getboolean('proxy', 'proxy', fallback=False):
-            proxy = self.spider.get_proxy()
-            if proxy:
-                self.kwargs['proxies'] = proxy.get_proxies()
-
-        self.logger = Spider.get_logger(
-            'worker_{id}'.format(id=threading.current_thread().ident)
-        )
+        self.logger.debug('request headers: {headers}'.format(
+            headers=self.kwargs['headers']))
 
     def run(self):
         while True:
@@ -214,17 +211,33 @@ class Worker(threading.Thread):
             if task is None:
                 continue
             url = task.url
-            self.logger.debug(
-                'request headers: {headers}'.format(
-                    headers=self.kwargs['headers']
-                )
-            )
+
+            node, args = self.spider.r.get_node(url)
+
+            if self._config.getboolean('base', 'filter'):
+                # todo: 过滤
+                if node is None or node.filter_type == 'exclude':
+                    continue
+
+            if self._config.getboolean('proxy', 'proxy', fallback=False):
+                proxy = self.spider.get_proxy()
+                if proxy:
+                    self.logger.debug(
+                        'request proxy: {proxy}'.format(proxy=proxy))
+                    self.kwargs['proxies'] = proxy.get_proxies()
+
+            print(self.kwargs)
+
             self.logger.info('start download page {url}'.format(url=url))
             r = requests.get(url, **self.kwargs)
+            self.logger.info('download page success {code} {url}'.format(
+                url=url, code=r.status_code))
             if r.status_code != 200:
-                pass
-
-            self.logger.info('download page success {url}'.format(url=url))
+                self.logger.info('http status code error {code} {url}'.format(
+                    url=url, code=r.status_code))
+                continue
+            self.logger.info('http status code success {code} {url}'.format(
+                url=url, code=r.status_code))
 
             soup = BeautifulSoup(r.text, "lxml")
             for a in soup.select('a'):
@@ -232,8 +245,6 @@ class Worker(threading.Thread):
                 sub_url = self.convert(href, url)
                 if not isinstance(sub_url, str):
                     continue
-
-                # todo: filter
 
                 sub_task = Task(sub_url)
                 self.spider.push_task(sub_task)
@@ -258,14 +269,12 @@ class Worker(threading.Thread):
 
 
 class Task(object):
-
     def __init__(self, url, type=None):
         self.type = type
         self.url = url
 
 
 class Config(object):
-
     def __new__(cls):
         if not hasattr(cls, '_instance'):
             cls._instance = super(Config, cls).__new__(cls)
@@ -306,7 +315,6 @@ class BaseQueue(object):
 
 
 class SimpleQueue(object):
-
     def __init__(self):
         self.queue = queue.PriorityQueue()
         self.view_set = set()
@@ -360,10 +368,9 @@ class RedisQueue(object):
 
 
 class Spider(object):
-
     def __init__(self, start_url):
         self._config = Config()
-        self._update_log_basicConfig()
+        self._update_log_basic_config()
 
         self.r = Route()
 
@@ -378,12 +385,12 @@ class Spider(object):
     def load_config_file(self, filenames):
         self._config.read_files(filenames)
 
-        self._update_log_basicConfig()
+        self._update_log_basic_config()
 
     def load_config_dict(self, d):
         self._config.read_dict(d)
 
-        self._update_log_basicConfig()
+        self._update_log_basic_config()
 
     def route(self, url):
         def _wrapper(func):
@@ -409,11 +416,17 @@ class Spider(object):
         if self.r.search(task.url):
             direct = 1
         self.task_queue.push_task(task, direct)
+        Spider.get_logger('task queue').debug('push {url} to task queue'.format(url=task.url))
 
     def pop_task(self):
-        return self.task_queue.pop_task()
+        task = self.task_queue.pop_task()
+        if task:
+            Spider.get_logger('task queue').debug('pop {url} from task queue'.format(url=task.url))
+        else:
+            Spider.get_logger('task queue').debug('task queue no task')
+        return task
 
-    def _update_log_basicConfig(self):
+    def _update_log_basic_config(self):
         level_dict = {
             "debug": logging.DEBUG,
             "info": logging.INFO,
@@ -421,7 +434,6 @@ class Spider(object):
             "error": logging.ERROR,
             "critical": logging.CRITICAL
         }
-
         level = level_dict[
             self._config.get('log', 'level', fallback='info').lower()
         ]
@@ -445,6 +457,9 @@ class Spider(object):
 
     def filter(self, include=None, exclude=None):
         if include:
-            self.include = include
-        elif exclude:
-            self.exclude = exclude
+            for url in include:
+                self.r.add(url, filter_type='include')
+
+        if exclude:
+            for url in exclude:
+                self.r.add(url, filter_type='exclude')

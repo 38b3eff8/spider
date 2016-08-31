@@ -28,18 +28,23 @@ def check_ip(proxy_ip_dict):
         return
 
     if delay is not None:
-        proxies = {
-            'http': '{type}://{ip}:{port}'.format(
-                type=proxy_ip_dict['proxy_type'],
-                ip=proxy_ip_dict['ip'],
-                port=proxy_ip_dict['port']
-            )
+        kwargs = {
+            "headers": {
+                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36"
+            },
+            "proxies": {
+                proxy_ip_dict['proxy_type']: '{type}://{ip}:{port}'.format(
+                    type=proxy_ip_dict['proxy_type'],
+                    ip=proxy_ip_dict['ip'],
+                    port=proxy_ip_dict['port']
+                )
+            },
+            "timeout": 10
         }
         try:
             r = requests.get(
-                'http://www.baidu.com',
-                proxies=proxies,
-                timeout=10
+                'http://www.xicidaili.com/nt/1',
+                **kwargs
             )
         except Exception as e:
             print('{ip} request timeout'.format(ip=proxy_ip_dict['ip']))
@@ -48,6 +53,7 @@ def check_ip(proxy_ip_dict):
         if r.status_code != 200:
             print('{ip} request error'.format(ip=proxy_ip_dict['ip']))
             return
+        print(r.status_code)
 
         session = Session()
 
