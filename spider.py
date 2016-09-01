@@ -17,6 +17,7 @@ float_number = re.compile('^[+,-]?\d+.?\d+$')
 
 
 class Route(object):
+
     def __init__(self):
         self.root = Node('/')
 
@@ -93,6 +94,7 @@ param_re = re.compile('<(int|string|float):([a-zA-Z_]\w+)>')
 
 
 class Node(object):
+
     def __init__(self, name, func=None, filter_type='include'):
         self.name = name
         self.sub_node = {}
@@ -136,13 +138,14 @@ class Node(object):
 
 
 class Response(object):
+
     def __init__(self):
         self.req = {}
 
     def get_response(self):
         return self.req[threading.current_thread().ident]
 
-    def add_response(self, pid, req):
+    def _add_response(self, pid, req):
         self.req[pid] = req
 
 
@@ -150,6 +153,7 @@ response = Response()
 
 
 class Proxy(object):
+
     def __init__(self, ip, port, proxy_type, user=None, password=None):
         self.ip = ip
         self.port = port
@@ -182,12 +186,13 @@ class Proxy(object):
 
 
 class Worker(threading.Thread):
+
     def __init__(self, spider):
         super().__init__()
         self.spider = spider
         self._config = Config()
 
-        self.logger = Spider.get_logger(
+        self._logger = Spider.get_logger(
             'worker_{id}'.format(id=threading.current_thread().ident)
         )
 
@@ -199,7 +204,7 @@ class Worker(threading.Thread):
             "headers": headers
         }
 
-        self.logger.debug('request headers: {headers}'.format(
+        self._logger.debug('request headers: {headers}'.format(
             headers=self.kwargs['headers']))
 
     def run(self):
@@ -222,21 +227,29 @@ class Worker(threading.Thread):
             if self._config.getboolean('proxy', 'proxy', fallback=False):
                 proxy = self.spider.get_proxy()
                 if proxy:
-                    self.logger.debug(
+                    self._logger.debug(
                         'request proxy: {proxy}'.format(proxy=proxy))
                     self.kwargs['proxies'] = proxy.get_proxies()
 
             print(self.kwargs)
 
-            self.logger.info('start download page {url}'.format(url=url))
-            r = requests.get(url, **self.kwargs)
-            self.logger.info('download page success {code} {url}'.format(
+            self._logger.info('start download page {url}'.format(url=url))
+            try:
+                r = requests.get(url, **self.kwargs)
+            except:
+                Exception as e:
+                task.try_times += 1
+                if task.try_times == self._config.getint('base', 'max_try_times', fallback=5):
+                    continue
+                self.spider.push_task(task)
+
+            self._logger.info('download page success {code} {url}'.format(
                 url=url, code=r.status_code))
             if r.status_code != 200:
-                self.logger.info('http status code error {code} {url}'.format(
+                self._logger.info('http status code error {code} {url}'.format(
                     url=url, code=r.status_code))
                 continue
-            self.logger.info('http status code success {code} {url}'.format(
+            self._logger.info('http status code success {code} {url}'.format(
                 url=url, code=r.status_code))
 
             soup = BeautifulSoup(r.text, "lxml")
@@ -252,7 +265,7 @@ class Worker(threading.Thread):
             func, args = self.spider.r.get_func(url)
             if func is None:
                 continue
-            response.add_response(threading.get_ident(), r)
+            response._add_response(threading.get_ident(), r)
             func(**args)
 
     @staticmethod
@@ -269,12 +282,15 @@ class Worker(threading.Thread):
 
 
 class Task(object):
-    def __init__(self, url, type=None):
+
+    def __init__(self, url, type=None, try_times=0):
         self.type = type
         self.url = url
+        self.try_times = try_times
 
 
 class Config(object):
+
     def __new__(cls):
         if not hasattr(cls, '_instance'):
             cls._instance = super(Config, cls).__new__(cls)
@@ -315,6 +331,7 @@ class BaseQueue(object):
 
 
 class SimpleQueue(object):
+
     def __init__(self):
         self.queue = queue.PriorityQueue()
         self.view_set = set()
@@ -368,6 +385,7 @@ class RedisQueue(object):
 
 
 class Spider(object):
+
     def __init__(self, start_url):
         self._config = Config()
         self._update_log_basic_config()
@@ -416,12 +434,14 @@ class Spider(object):
         if self.r.search(task.url):
             direct = 1
         self.task_queue.push_task(task, direct)
-        Spider.get_logger('task queue').debug('push {url} to task queue'.format(url=task.url))
+        Spider.get_logger('task queue').debug(
+            'push {url} to task queue'.format(url=task.url))
 
     def pop_task(self):
         task = self.task_queue.pop_task()
         if task:
-            Spider.get_logger('task queue').debug('pop {url} from task queue'.format(url=task.url))
+            Spider.get_logger('task queue').debug(
+                'pop {url} from task queue'.format(url=task.url))
         else:
             Spider.get_logger('task queue').debug('task queue no task')
         return task

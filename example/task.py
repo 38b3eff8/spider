@@ -30,7 +30,7 @@ def check_ip(proxy_ip_dict):
     if delay is not None:
         proxies = {
             "http": '{type}://{ip}:{port}'.format(
-                type=proxy_ip_dict['proxy_type'],
+                type=proxy_ip_dict['schema'],
                 ip=proxy_ip_dict['ip'],
                 port=proxy_ip_dict['port']
             )
