@@ -9,7 +9,7 @@ import queue
 
 from urllib.parse import urlparse, urljoin
 
-from bs4 import BeautifulSoup
+from lxml import etree
 import requests
 
 int_number = re.compile('^[+,-]?\d+')
@@ -71,13 +71,6 @@ class Route(object):
                 return None
 
         return _get_node(self.root, parts), args
-
-    def get_func(self, url):
-        node, args = self.get_node(url)
-        if node:
-            return node.func, args
-        else:
-            return None, args
 
     def search(self, url):
         node, args = self.get_node(url)
@@ -192,6 +185,9 @@ class Worker(threading.Thread):
         self.spider = spider
         self._config = Config()
 
+        self._filter = self._config.getboolean('base', 'filter')
+        self._proxy = self._config.getboolean('proxy', 'proxy', fallback=False)
+
         self._logger = Spider.get_logger(
             'worker_{id}'.format(id=threading.current_thread().ident)
         )
@@ -219,32 +215,29 @@ class Worker(threading.Thread):
 
             node, args = self.spider.r.get_node(url)
 
-            if self._config.getboolean('base', 'filter'):
-                # todo: 过滤
-                if node is None or node.filter_type == 'exclude':
-                    continue
+            if self._filter and (not node or node.filter_type == 'exclude'):
+                continue
 
-            if self._config.getboolean('proxy', 'proxy', fallback=False):
+            if self._proxy:
                 proxy = self.spider.get_proxy()
                 if proxy:
+                    self.kwargs['proxies'] = proxy.get_proxies()
                     self._logger.debug(
                         'request proxy: {proxy}'.format(proxy=proxy))
-                    self.kwargs['proxies'] = proxy.get_proxies()
 
             print(self.kwargs)
 
-            self._logger.info('start download page {url}'.format(url=url))
             try:
+                self._logger.info('start download page {url}'.format(url=url))
                 r = requests.get(url, **self.kwargs)
-            except:
-                Exception as e:
+            except Exception as e:
                 task.try_times += 1
                 if task.try_times == self._config.getint('base', 'max_try_times', fallback=5):
                     continue
                 self.spider.push_task(task)
+                self._logger.debug('retry task {url} {try_times}'.format(
+                    url=url, try_times=task.try_times))
 
-            self._logger.info('download page success {code} {url}'.format(
-                url=url, code=r.status_code))
             if r.status_code != 200:
                 self._logger.info('http status code error {code} {url}'.format(
                     url=url, code=r.status_code))
@@ -252,21 +245,17 @@ class Worker(threading.Thread):
             self._logger.info('http status code success {code} {url}'.format(
                 url=url, code=r.status_code))
 
-            soup = BeautifulSoup(r.text, "lxml")
-            for a in soup.select('a'):
-                href = a.get('href')
+            tree = etree.HTML(r.text)
+            result = tree.xpath('//a')
+
+            for item in result:
+                href = item.attrib.get('href')
                 sub_url = self.convert(href, url)
-                if not isinstance(sub_url, str):
-                    continue
+                if sub_url:
+                    self.spider.push_task(Task(sub_url))
 
-                sub_task = Task(sub_url)
-                self.spider.push_task(sub_task)
-
-            func, args = self.spider.r.get_func(url)
-            if func is None:
-                continue
             response._add_response(threading.get_ident(), r)
-            func(**args)
+            node.func(**args)
 
     @staticmethod
     def convert(href, url):
@@ -430,10 +419,8 @@ class Spider(object):
             Worker(self).start()
 
     def push_task(self, task):
-        direct = 0
-        if self.r.search(task.url):
-            direct = 1
-        self.task_queue.push_task(task, direct)
+        level = self.get_priority(url=task.url)
+        self.task_queue.push_task(task, level)
         Spider.get_logger('task queue').debug(
             'push {url} to task queue'.format(url=task.url))
 
@@ -483,3 +470,14 @@ class Spider(object):
         if exclude:
             for url in exclude:
                 self.r.add(url, filter_type='exclude')
+
+    def priority(self):
+        def _wrapper(func):
+            self.get_proxy = func
+        return _wrapper
+
+    @staticmethod
+    def get_priority(url=None):
+        level = 0
+        if self.r.search(url):
+            return 100

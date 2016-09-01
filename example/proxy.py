@@ -39,8 +39,8 @@ def nt_page(id):
     print('id: {0}'.format(id))
 
     resp = response.get_response()
-    print(resp.text)
-    soup = BeautifulSoup(resp.text)
+
+    soup = BeautifulSoup(resp.text, 'lxml')
     ip_list = soup.select('#ip_list tr')
     for index in range(1, len(ip_list)):
         proxy_ip_dict = {}
@@ -66,10 +66,10 @@ def nt_page(id):
 
         proxy_ip_dict['transparent'] = td_list[4].text
 
-        proxy_type = td_list[5].text
-        if proxy_type == 'socks4/5':
+        schema = td_list[5].text
+        if schema == 'socks4/5':
             return
-        proxy_ip_dict['proxy_type'] = proxy_type.lower()
+        proxy_ip_dict['schema'] = schema.lower()
 
         task.check_ip.delay(proxy_ip_dict)
 
