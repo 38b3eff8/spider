@@ -23,6 +23,7 @@ def create_worker(work_id, spider, response):
     log = logger.get_logger('work-{id}'.format(id=work_id))
 
     def worker():
+        log.info('start worker {0}'.format(work_id))
         while True:
             task = task_queue.pop_task()
             if task is None:
@@ -35,10 +36,14 @@ def create_worker(work_id, spider, response):
                 kwargs['proxies'] = proxy.get_proxies()
 
             try:
+                log.info('start download page : {url}'.format(url=task.url))
                 r = requests.get(task.url, **kwargs)
+                log.info('download page success : {url}'.format(url=task.url))
             except ConnectionError as e:
+                log.debug('download page error, retry again : {url}'.format(url=task.url))
                 task.try_times += 1
                 if task.try_times == max_try_times:
+                    log.debug('max try times : {url}'.format(url=task.url))
                     continue
 
                 spider.push_task(task)

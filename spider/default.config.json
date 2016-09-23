@@ -1,6 +1,6 @@
 {
   "base": {
-    "worker": 1,
+    "worker": 5,
     "queue": "redis",
     "filter": true,
     "max_try_times": 5,
