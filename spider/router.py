@@ -95,6 +95,7 @@ class Router(object):
                     if value is None:
                         continue
                     args[sub_node.param_name] = value
+
                 if not len(sub_node.sub_node):
                     return sub_node
                 else:

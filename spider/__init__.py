@@ -1,1 +1,1 @@
-from spider import Spider, response
+from .spider import Spider, response

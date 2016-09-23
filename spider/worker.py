@@ -28,7 +28,6 @@ def create_worker(work_id, spider, response):
             if task is None:
                 continue
             node, args = router.get_node(task.url)
-
             # todo: filter
 
             if config_proxy:
@@ -56,8 +55,9 @@ def create_worker(work_id, spider, response):
                 if sub_url:
                     task_queue.push_url(sub_url)
 
-            response.response = r
-            node.func(**args)
+            if node and node.func:
+                response.response = r
+                node.func(**args)
 
     return worker
 

@@ -9,7 +9,7 @@ import threading
 #
 # from proxy.model import Session, ProxyIP
 
-spider = Spider('https://www.zhihu.com')
+spider = Spider('http://www.waduanzi.com/')
 
 
 # @spider.proxy
@@ -25,18 +25,19 @@ spider = Spider('https://www.zhihu.com')
 #         return None
 
 
-@spider.route('/question/<int:id>')
+@spider.route('/archives/<int:id>')
 def test(id):
     r = response.response
     soup = BeautifulSoup(r.text, "lxml")
     now = time.strftime('[%Y-%m-%d %H:%M:%S]', time.localtime(time.time()))
-    title_tag = soup.select('.zm-item-title span')
+    title_tag = soup.title.string
+    print(title_tag)
     with open('log.txt', 'a') as f:
         f.write('{0} {1} {2} {3}\t{4}\n'.format(
             now,
             id,
             threading.current_thread().ident,
-            title_tag[0].string if title_tag else '',
+            title_tag,
             r.url)
         )
 
