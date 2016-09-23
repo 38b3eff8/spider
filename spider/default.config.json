@@ -1,0 +1,17 @@
+{
+  "base": {
+    "worker": 5,
+    "queue": "redis",
+    "filter": true,
+    "max_try_times": 5,
+    "timeout": 10,
+    "proxy": false
+  },
+  "log": {
+    "level": "info",
+    "filename": "spider.log"
+  },
+  "headers": {
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.106 Safari/537.36"
+  }
+}

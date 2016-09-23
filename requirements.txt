@@ -1,3 +1,5 @@
 lxml==3.6.4
+py==1.4.31
+pytest==3.0.2
 redis==2.10.5
 requests==2.11.1
