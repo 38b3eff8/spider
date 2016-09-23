@@ -23,25 +23,25 @@ class BaseQueue(object):
         self.push_task(task, level)
 
 
-class SimpleQueue(object):
+class SimpleQueue(BaseQueue):
     def __init__(self):
         self.queue = queue.PriorityQueue()
         self.view_set = set()
         self._queue_lock = threading.Lock()
 
     def push_task(self, task, level=0):
-        with self._queue_lock:
-            self.view_set.add(task.url)
-            self.queue.put((-level, task))
+        self.queue.put((-level, task))
+        self.view_set.add(task.url)
 
     def pop_task(self):
-        self.queue.get()
+        task = self.queue.get()
+        return task[1]
 
     def is_view_url(self, url):
         return url in self.view_set
 
 
-class RedisQueue(object):
+class RedisQueue(BaseQueue):
     _VIEW_URL = 'view_url'
     _TASK_QUEUE = 'task_queue'
 

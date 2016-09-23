@@ -4,10 +4,11 @@ import requests
 from lxml import etree
 
 from .config import config
+from .logger import logger
 
 
-def create_worker(spider, response):
-    router = spider.route
+def create_worker(work_id, spider, response):
+    router = spider.r
     task_queue = spider.task_queue
 
     config_proxy = config['base']['proxy']
@@ -19,13 +20,13 @@ def create_worker(spider, response):
         "headers": headers
     }
 
+    log = logger.get_logger('work-{id}'.format(id=work_id))
+
     def worker():
         while True:
             task = task_queue.pop_task()
             if task is None:
-                # todo: wait
                 continue
-
             node, args = router.get_node(task.url)
 
             # todo: filter
@@ -55,8 +56,7 @@ def create_worker(spider, response):
                 if sub_url:
                     task_queue.push_url(sub_url)
 
-            # todo: add to response
-            response.
+            response.response = r
             node.func(**args)
 
     return worker
