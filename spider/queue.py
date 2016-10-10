@@ -51,7 +51,7 @@ class RedisQueue(BaseQueue):
 
     def push_task(self, task, level=0):
         pipe = self._redis.pipeline()
-        if pipe.sismember(RedisQueue._VIEW_URL, task.url):
+        if self._redis.sismember(RedisQueue._VIEW_URL, task.url):
             return
 
         pipe.sadd(RedisQueue._VIEW_URL, task.url)
@@ -65,7 +65,8 @@ class RedisQueue(BaseQueue):
                 RedisQueue._TASK_QUEUE,
                 pickle.dumps(task)
             )
-        pipe.execute()
+        print('asd')
+        print(pipe.execute())
 
     def pop_task(self):
         task = self._redis.rpop(RedisQueue._TASK_QUEUE)
