@@ -48,25 +48,24 @@ class RedisQueue(BaseQueue):
     def __init__(self, host='localhost', port=6379, db=0):
         self._redis = redis.Redis(host, port, db)
         self._redis.flushall()
-        self._queue_lock = threading.Lock()
 
     def push_task(self, task, level=0):
+        pipe = self._redis.pipeline()
+        if pipe.sismember(RedisQueue._VIEW_URL, task.url):
+            return
 
-        with self._queue_lock:
-            if self._redis.sismember(RedisQueue._VIEW_URL, task.url):
-                return
-
-            self._redis.sadd(RedisQueue._VIEW_URL, task.url)
-            if level == 0:
-                self._redis.lpush(
-                    RedisQueue._TASK_QUEUE,
-                    pickle.dumps(task)
-                )
-            else:
-                self._redis.rpush(
-                    RedisQueue._TASK_QUEUE,
-                    pickle.dumps(task)
-                )
+        pipe.sadd(RedisQueue._VIEW_URL, task.url)
+        if level == 0:
+            pipe.lpush(
+                RedisQueue._TASK_QUEUE,
+                pickle.dumps(task)
+            )
+        else:
+            pipe.rpush(
+                RedisQueue._TASK_QUEUE,
+                pickle.dumps(task)
+            )
+        pipe.execute()
 
     def pop_task(self):
         task = self._redis.rpop(RedisQueue._TASK_QUEUE)
