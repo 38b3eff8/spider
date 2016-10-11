@@ -1,17 +1,15 @@
 from bs4 import BeautifulSoup
+from sqlalchemy import func
 
-from spider.spider import Spider, response, Proxy
+from spider import Spider, response
 import task
 
-from sqlalchemy import func
 from model import Session, ProxyIP
 
 spider = Spider('http://www.xicidaili.com/nt/1')
+session = Session()
 
-spider.load_config_dict({
-    "proxy": {
-        "proxy": True,
-    },
+spider.update_config({
     "base": {
         "worker": 1
     },
@@ -21,24 +19,24 @@ spider.load_config_dict({
 })
 
 
-@spider.proxy
-def get_proxy():
-    session = Session()
+# @spider.proxy
+# def get_proxy():
+#     session = Session()
 
-    proxy_ip = session.query(ProxyIP).filter(
-        ProxyIP.delay <= 200).order_by(func.random()).first()
+#     proxy_ip = session.query(ProxyIP).filter(
+#         ProxyIP.delay <= 200).order_by(func.random()).first()
 
-    if proxy_ip:
-        return Proxy(proxy_ip.ip, proxy_ip.port, proxy_ip.proxy_type)
-    else:
-        return None
+#     if proxy_ip:
+#         return Proxy(proxy_ip.ip, proxy_ip.port, proxy_ip.proxy_type)
+#     else:
+#         return None
 
 
 @spider.route('/nt/<int:id>')
 def nt_page(id):
     print('id: {0}'.format(id))
 
-    resp = response.get_response()
+    resp = response.response
 
     soup = BeautifulSoup(resp.text, 'lxml')
     ip_list = soup.select('#ip_list tr')
@@ -72,7 +70,15 @@ def nt_page(id):
         proxy_ip_dict['schema'] = schema.lower()
 
         task.check_ip.delay(proxy_ip_dict)
+        # proxy_ip = session.query(ProxyIP).filter(
+        #     ProxyIP.ip == proxy_ip_dict['ip']
+        # ).first()
 
+        # if not proxy_ip:
+        #     proxy_ip = ProxyIP()
+        #     proxy_ip.load_attr(proxy_ip_dict)
+        #     session.add(proxy_ip)
+        # session.commit()
 
 if __name__ == '__main__':
     spider.run()
