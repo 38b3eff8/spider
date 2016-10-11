@@ -1,4 +1,5 @@
 from urllib.parse import urlparse, urljoin
+import time
 
 import requests
 from lxml import etree
@@ -11,8 +12,9 @@ def create_worker(work_id, spider, response):
     router = spider.r
     task_queue = spider.task_queue
 
-    config_proxy = config['base']['proxy']
-    max_try_times = config['base']['max_try_times']
+    config_proxy = config['base'].get('proxy', False)
+    max_try_times = config['base'].get('max_try_times', 0)
+    sleeptime = config['base'].get('sleeptime', 0)
 
     headers = config['headers']
 
@@ -23,6 +25,8 @@ def create_worker(work_id, spider, response):
     log = logger.get_logger('work-{id}'.format(id=work_id))
 
     def worker():
+        if sleeptime:
+            time.sleep(sleeptime)
         log.info('start worker {0}'.format(work_id))
         while True:
             task = task_queue.pop_task()
@@ -40,7 +44,8 @@ def create_worker(work_id, spider, response):
                 r = requests.get(task.url, **kwargs)
                 log.info('download page success : {url}'.format(url=task.url))
             except ConnectionError as e:
-                log.debug('download page error, retry again : {url}'.format(url=task.url))
+                log.debug(
+                    'download page error, retry again : {url}'.format(url=task.url))
                 task.try_times += 1
                 if task.try_times == max_try_times:
                     log.debug('max try times : {url}'.format(url=task.url))

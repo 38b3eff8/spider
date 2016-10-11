@@ -1,10 +1,10 @@
 __pycache__/
 fabfile.pyc
-/.idea/
-/tmp/
-/app_test/
-/app_test.py
-/.vscode
+.idea/
+tmp/
+app_test/
+app_test.py
+.vscode/
 log.txt
 /helper.py
 /proxy/secret.py

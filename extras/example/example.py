@@ -9,8 +9,15 @@ import threading
 #
 # from proxy.model import Session, ProxyIP
 
-spider = Spider('http://www.waduanzi.com/')
-
+spider = Spider('http://www.duzhebao.com/a/jW14Qj.htm')
+spider.update_config({
+    "base": {
+        "worker": 1
+    },
+    "log": {
+        "level": "debug"
+    }
+})
 
 # @spider.proxy
 # def get_proxy():
@@ -25,7 +32,7 @@ spider = Spider('http://www.waduanzi.com/')
 #         return None
 
 
-@spider.route('/archives/<int:id>')
+@spider.route('/a/<string:id>.htm')
 def test(id):
     r = response.response
     soup = BeautifulSoup(r.text, "lxml")

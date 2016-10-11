@@ -65,8 +65,7 @@ class RedisQueue(BaseQueue):
                 RedisQueue._TASK_QUEUE,
                 pickle.dumps(task)
             )
-        print('asd')
-        print(pipe.execute())
+        pipe.execute()
 
     def pop_task(self):
         task = self._redis.rpop(RedisQueue._TASK_QUEUE)

@@ -23,7 +23,7 @@ class Node(object):
                 self.pattern = re.sub(
                     '<int:\w+>', '([+,-]{0,1}\d+)', self.name)
             elif self.param_type == 'string':
-                self.pattern = re.sub('<string:\w+>', '\w+', self.name)
+                self.pattern = re.sub('<string:\w+>', '(\w+)', self.name)
             elif self.param_type == 'float':
                 self.pattern = re.sub(
                     '<float:\w+>', '([+,-]{0,1}\d+.{0,1}\d+)', self.name)

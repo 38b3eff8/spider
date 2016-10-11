@@ -49,3 +49,6 @@ class Spider(object):
         if exclude:
             for url in exclude:
                 self.r.add(url, filter_type='exclude')
+    
+    def update_config(self, new_config):
+        config.update_config(new_config)
