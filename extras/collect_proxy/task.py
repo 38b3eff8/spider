@@ -39,13 +39,6 @@ def check_ip(proxy_ip_dict):
         headers = {
             "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36"
         }
-        try:
-            r = requests.get(
-                'http://www.xicidaili.com/nt/1',
-                **kwargs
-            )
-        except Exception as e:
-            return
 
         try:
             r = requests.get('http://www.xicidaili.com/nt/1',
