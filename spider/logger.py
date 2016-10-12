@@ -1,4 +1,5 @@
 import logging
+
 from .config import config
 
 level_dict = {
@@ -11,6 +12,7 @@ level_dict = {
 
 
 class Logger(object):
+
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, '_instance'):
             cls._instance = super(Logger, cls).__new__(cls)

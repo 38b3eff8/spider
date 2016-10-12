@@ -1,4 +1,5 @@
 class Proxy(object):
+
     def __init__(self, ip, port, proxy_type, user=None, password=None):
         self.ip = ip
         self.port = port
@@ -20,7 +21,6 @@ class Proxy(object):
             "user": self.user,
             "password": self.password
         })
-
         return {
             "http": proxy_str,
             "https": proxy_str
